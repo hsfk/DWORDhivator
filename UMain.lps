@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <ProjectSession>
+    <PathDelim Value="\"/>
+    <Version Value="9"/>
+    <BuildModes Active="Default"/>
+    <Units Count="6">
+      <Unit0>
+        <Filename Value="UMain.pas"/>
+        <IsPartOfProject Value="True"/>
+        <CursorPos X="18" Y="2"/>
+        <UsageCount Value="95"/>
+        <Loaded Value="True"/>
+      </Unit0>
+      <Unit1>
+        <Filename Value="UTree.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="3"/>
+        <CursorPos X="16" Y="26"/>
+        <UsageCount Value="94"/>
+        <Loaded Value="True"/>
+      </Unit1>
+      <Unit2>
+        <Filename Value="UPackUnpack.pas"/>
+        <IsPartOfProject Value="True"/>
+        <IsVisibleTab Value="True"/>
+        <EditorIndex Value="1"/>
+        <TopLine Value="170"/>
+        <CursorPos X="16" Y="193"/>
+        <UsageCount Value="79"/>
+        <Loaded Value="True"/>
+      </Unit2>
+      <Unit3>
+        <Filename Value="bitoperations.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="BitOperations"/>
+        <EditorIndex Value="-1"/>
+        <CursorPos X="11"/>
+        <UsageCount Value="41"/>
+      </Unit3>
+      <Unit4>
+        <Filename Value="UFileAnalization.pas"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="2"/>
+        <CursorPos X="19" Y="9"/>
+        <UsageCount Value="24"/>
+        <Loaded Value="True"/>
+      </Unit4>
+      <Unit5>
+        <Filename Value="BitOps.pas"/>
+        <EditorIndex Value="4"/>
+        <CursorPos X="32" Y="29"/>
+        <UsageCount Value="19"/>
+        <Loaded Value="True"/>
+      </Unit5>
+    </Units>
+    <JumpHistory Count="3" HistoryIndex="2">
+      <Position1>
+        <Filename Value="UPackUnpack.pas"/>
+        <Caret Line="25" Column="19"/>
+      </Position1>
+      <Position2>
+        <Filename Value="UMain.pas"/>
+        <Caret Line="22" Column="16"/>
+      </Position2>
+      <Position3>
+        <Filename Value="UMain.pas"/>
+        <Caret Line="47" Column="13" TopLine="10"/>
+      </Position3>
+    </JumpHistory>
+  </ProjectSession>
+</CONFIG>
