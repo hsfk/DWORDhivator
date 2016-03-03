@@ -5,218 +5,260 @@ unit UPackUnpack;
 interface
 
 uses
-  Classes, SysUtils, Math, UTree, crt, bitops, UFileAnalization;
+  Classes, SysUtils, Math, UTree, crt, UBitOps;
 
 type
-  Cache = array [0..255] of string;
-  FrequencyTable = array [0..255] of longword;
-
   THuffman = class
   public
-    procedure Create(SomeCache: cache; SomeTable: FrequencyTable);
-    function Pack(filename: string): boolean;
-    function Unpack(filename: string): boolean;
+    constructor Create(mask: string);
+    procedure Pack;
+    procedure Unpack;
   private
+    filename: string;
+    Table: FrequencyTable;
+    Output: Text;
+    LCache: LengthCache;
+    msInput: TMemoryStream;
+    function GetFrequency(var MStream: TMemoryStream): FrequencyTable;
+    function ReadTitle(MStream: TMemoryStream): LengthCache;
+    procedure WriteTitle(var Output_: Text);
   end;
-
-var
-  Routes: cache;
-  Table: FrequencyTable;
-  LastNills: byte;
-  Ftree: Ttree;
-  FFile: Tfile;
-  FBit: Tbit;
 
 implementation
 
-procedure THuffman.Create(SomeCache: cache; SomeTable: FrequencyTable);
-begin
-  Routes := SomeCache;
-  Table := SomeTable;
-  LastNills := 0;
-end;
-
-function THuffman.Unpack(filename: string): boolean;
+constructor THuffman.Create(mask: string);
 var
-  output: Text;
-  msInput: TMemoryStream;
-  sizeoffile, Pbar, PbarC: int64;
-  symbol, i: byte;
-  root, tmp: nodeptr;
-  Byte_: string;
-
-  LCache: LengthCache;
-
+  Info: TSearchRec;
+  Files: TStringList;
+  i: integer;
+  n: integer;
 begin
+  clrscr;
+  i := 1;
+  Files := TStringList.Create;
+  if FindFirst(mask, faAnyFile - faDirectory, Info) = 0 then begin
+    repeat
+      with Info do begin
+        writeln(i, '. ', Name, '  ', Size, ' byte');
+        Files.Add(Name);
+        i += 1;
+      end;
+    until FindNext(info) <> 0;
+  end;
+  FindClose(Info);
+  while filename = '' do begin
+    writeln('Input file number: ');
+    Read(n);
+    if (n - 1 < 0) or ((n - 1) > (i - 1)) then begin
+      writeln('Input correct file number');
+    end
+    else
+      filename := files[n - 1];
+  end;
   msInput := TMemoryStream.Create;
   msInput.LoadFromFile(filename);
+  msInput.seek(0, soBeginning);
+end;
+
+procedure THuffman.Unpack;
+var
+  LastNulls: byte;
+  Root: NodePtr;
+  Temp: NodePtr;
+  Byte_s: string;
+  SizeOfFile: int64;
+  Symbol: byte;
+  i: byte;
+begin
   SetLength(filename, length(filename) - 7);
   filename := 'unp - ' + filename;
-  Assign(output, filename);
-  rewrite(output);
-  msInput.seek(0, soBeginning);
+  Assign(Output, filename);
+  rewrite(Output);
 
-  Byte_ := '';
-  for i := 0 to 3 do begin
-    symbol := msInput.ReadByte;
-    Byte_ += chr(symbol);
-  end;
-  if Byte_ <> 'SOLG' then begin
-    Result := False;
-    exit;
-  end;
-  for i := 0 to 255 do begin
-    symbol := msInput.ReadByte;
-    LCache[i] := symbol;//по таблице длин(она же высота в дереве) будем строить дерево
-  end;
+  LCache := ReadTitle(msInput);
+  Table := Tree.GetFTable(LCache);
+  Root := Tree.MakeTree(Table);
 
-  Table := Ftree.GetFTable(LCache);
-  root := Ftree.MakeTree(Table);
-
-  SizeOfFile := msInput.Size - 256 - 4 - 1 - 1;   //4 solg 256 table 1 - last nil
-  Pbar := SizeOfFile;
-  PbarC := 1;//progress bar
-  tmp := root;
-  Byte_ := '00000000';
+  SizeOfFile := msInput.Size - 256 - 4 - 1 - 1;
+  Temp := Root;
+  Byte_s := '00000000';
 
   while SizeOfFile <> 0 do begin
-    symbol := msInput.ReadByte;
+    Symbol := msInput.ReadByte;
     for i := 0 to 7 do begin
-      if ((symbol and round(power(2, 7 - i))) <> 0) and (tmp^.right <> nil) then
-        tmp := tmp^.right//если 7-i бит == 1
-      else if tmp^.left <> nil then
-        tmp := tmp^.left;
-      if tmp^.flag = True then begin
-        Write(output, chr(tmp^.key));
-        tmp := root;
+      if ((Symbol and round(power(2, 7 - i))) <> 0) and (Temp^.Right <> nil) then
+        Temp := Temp^.Right
+      else if Temp^.Left <> nil then
+        Temp := Temp^.Left;
+      if Temp^.IsLeave = True then begin
+        Write(Output, chr(Temp^.Key));
+        Temp := Root;
       end;
     end;
-
-    PbarC += 1;
-    if (PbarC mod (Pbar div 100)) = 0 then begin
-      clrscr;
-      writeln('progress ', round((PbarC / pbar) * 100), ' %');
-    end;
-
     SizeOfFile -= 1;
   end;
 
-  symbol := msInput.ReadByte;
-  Byte_ := '00000000';
+  Symbol := msInput.ReadByte;
+  Byte_s := '00000000';
   for i := 0 to 7 do begin
-    if (symbol and round(power(2, 7 - i))) <> 0 then
-      Byte_[i + 1] := '1'
+    if (Symbol and round(power(2, 7 - i))) <> 0 then
+      Byte_s[i + 1] := '1'
     else
-      Byte_[i + 1] := '0';
+      Byte_s[i + 1] := '0';
   end;
-  LastNills := msInput.ReadByte;
+  LastNulls := msInput.ReadByte;
 
-  if LastNills <> 11 then begin
-    for i := 1 to lastNills do
-      Byte_ := copy(Byte_, 2, length(Byte_));  //2 - убирает 1й ноль
+  if LastNulls <> 11 then begin
+    for i := 1 to LastNulls do
+      Byte_s := copy(Byte_s, 2, length(Byte_s));
   end;
 
-  for i := 1 to length(Byte_) do begin
-    if (Byte_[i] = '1') and (tmp^.right <> nil) then
-      tmp := tmp^.right
-    else if tmp^.left <> nil then
-      tmp := tmp^.left;
-    if tmp^.flag = True then begin
-      Write(output, chr(tmp^.key));
-      tmp := root;
+  for i := 1 to length(Byte_s) do begin
+    if (Byte_s[i] = '1') and (Temp^.Right <> nil) then
+      Temp := Temp^.Right
+    else if Temp^.Left <> nil then
+      Temp := Temp^.Left;
+    if Temp^.IsLeave = True then begin
+      Write(Output, chr(Temp^.Key));
+      Temp := Root;
     end;
   end;
+
   msInput.Free;
-  Close(output);
-  Result := True;
+  Close(Output);
 end;
 
-function THuffman.Pack(filename: string): boolean;
+procedure THuffman.Pack;
 var
-  output: Text;
-  msInput: TMemoryStream;
-  sizeoffile: int64;
-  symbol, i: byte;
-
   BCache: BitCache;
-  Lcache: LengthCache;
-  Buffer, temp: longword;
+  LastNulls: byte;
+  Routes: Cache;
+  Buffer: longword;
+  Temp: longword;
   BufLength: byte;
-  t_start, t_end: TDateTime;
+  SizeOfFile: int64;
+  Symbol: word;
+  i: byte;
 begin
-  msInput := TMemoryStream.Create;
-  msInput.LoadFromFile(filename);
-  Assign(output, filename + '.testpb');
-  rewrite(output);
+  Assign(Output, filename + '.testpb');
+  rewrite(Output);
 
-  Table := FFile.GetFrequency(msInput);
+  Table := GetFrequency(msInput);
+  Routes := Tree.GetCache(Table);
+  LCache := BitOps.GetLengthCache(Routes);
+  BCache := Tree.GetBCache(LCache);
 
-  Routes := Ftree.GetTable(Table);
-  LCache := Fbit.GetLengthCache(Routes);
-  BCache := Ftree.GetBCache(LCache);
+  WriteTitle(Output);
 
-  Write(output, 'SOLG');
-  for i := 0 to 255 do
-    Write(output, chr(LCache[i]));
-
-  sizeoffile := msInput.Size;
+  SizeOfFile := msInput.Size;
   Buffer := 0;
   BufLength := 0;
-
-  t_start := Time;
   msInput.Seek(0, soBeginning);
   while SizeOfFile <> 0 do begin
     while (bufLength < 8) and (SizeOfFile <> 0) do begin
-      symbol := msInput.ReadByte;
-      temp := BCache[symbol];//BCache-путь к символу по дереву, записанный в битах числа
-      BufLength += LCache[symbol];//LCache - длина пути
-      temp := temp shl (32 - bufLength);//buffer - очередь битов путей в lworde
-      Buffer := Buffer or temp;          //кладем пути в очередь
+      Symbol := msInput.ReadByte;
+      //asm
+      //         MOV     ECX, Symbol
+      //         MOV     AL, LCache[0 + ECX]
+      //         ADD     BufLength, AL
+      //         MOV     ECX, ECX
+      //         MOV     EBX, BCache[ECX]
+      //
+      //         MOV     CL, 32
+      //         SUB     CL, BufLength
+      //         SHL     EAX, CL
+      //         OR      Buffer, EAX
+      //end;
+      Temp := BCache[Symbol];
+      BufLength += LCache[Symbol];
+      Temp := Temp shl (32 - bufLength);
+      Buffer := Buffer or Temp;
       SizeOfFile -= 1;
     end;
-
     if SizeOfFile = 0 then
       break;
-
     asm
-             MOVSS   XMM0, BUFFER
+             MOVSS   XMM0, Buffer
              PSRLD   XMM0, 24
-             MOVSS   TEMP, XMM0
-             MOVSS   XMM0, BUFFER      //вытаскиваем 8 бит из очереди в temp
+             MOVSS   Temp, XMM0
+             MOVSS   XMM0, Buffer
              PSLLD   XMM0, 8
-             MOVSS   BUFFER, XMM0
-             SUB     BUFLENGTH, 8
+             MOVSS   Buffer, XMM0
+             SUB     BufLength, 8
     end;
-    Write(output, chr(temp));
+    Write(Output, chr(Temp));
   end;
 
-  while BufLength >= 8 do begin //если в очереди больше 1 байта
-    temp := buffer shr 24;
-    buffer := buffer shl 8;
+  while BufLength >= 8 do begin
+    Temp := Buffer shr 24;
+    Buffer := Buffer shl 8;
     BufLength -= 8;
-    Write(output, chr(temp));
+    Write(Output, chr(Temp));
   end;
 
   if BufLength <> 0 then begin
-    LastNills := 8 - BufLength; //LastNills - последний байт файла отчечающий за
-    buffer := buffer shr lastnills;//остаток, те если остаток < 8 бит то к нему
-    buffer := buffer shr 24;//накинутся LastNills нулей
-    Write(output, chr(buffer));
+    LastNulls := 8 - BufLength;
+    Buffer := Buffer shr LastNulls;
+    Buffer := Buffer shr 24;
+    Write(Output, chr(Buffer));
   end;
 
-  if (LastNills < 8) and (LastNills > 0) then
-    Write(output, chr(LastNills))
+  if (LastNulls < 8) and (LastNulls > 0) then
+    Write(Output, chr(LastNulls))
   else
-    Write(output, chr(11));//если нулей нет
-  t_end := time;
+    Write(Output, chr(11));
 
-  writeln('TIME: ', TimeToStr(t_end - t_start));
-  writeln('PRESS ANY KEY TO CONTINUE');
-  readln;
-  readln;
   msInput.Free;
-  Close(output);
-  Result := True;
+  Close(Output);
+end;
+
+function THuffman.GetFrequency(var MStream: TmemoryStream): FrequencyTable;
+var
+  SizeOfFile: int64;
+  Symbol: byte;
+  i: byte;
+begin
+  MStream.Seek(0, soBeginning);
+  for i := 0 to 255 do
+    Result[i] := 0;
+  SizeOfFile := MStream.Size;
+  while SizeOfFile <> 0 do begin
+    Symbol := MStream.ReadByte;
+    Result[Symbol] += 1;
+    SizeOfFile -= 1;
+  end;
+  MStream.Seek(0, soBeginning);
+end;
+
+function THuffman.ReadTitle(MStream: TMemoryStream): LengthCache;
+var
+  i: byte;
+  Symbol: byte;
+  Byte_s: string;
+begin
+  Byte_s := '';
+  for i := 0 to 3 do begin
+    Symbol := MStream.ReadByte;
+    Byte_s += chr(Symbol);
+  end;
+  if Byte_s <> 'SOLG' then begin
+    writeln('Incorrect file format');
+    readln;
+    exit;
+  end;
+  for i := 0 to 255 do begin
+    Symbol := MStream.ReadByte;
+    Result[i] := Symbol;
+  end;
+end;
+
+procedure THuffman.WriteTitle(var Output_: Text);
+var
+  i: byte;
+begin
+  Write(Output_, 'SOLG');
+  for i := 0 to 255 do
+    Write(Output_, chr(LCache[i]));
 end;
 
 end.

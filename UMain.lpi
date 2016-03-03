@@ -31,7 +31,7 @@
         <FormatVersion Value="1"/>
       </local>
     </RunParams>
-    <Units Count="5">
+    <Units Count="4">
       <Unit0>
         <Filename Value="UMain.pas"/>
         <IsPartOfProject Value="True"/>
@@ -45,14 +45,9 @@
         <IsPartOfProject Value="True"/>
       </Unit2>
       <Unit3>
-        <Filename Value="bitoperations.pas"/>
+        <Filename Value="UBitOps.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="BitOperations"/>
       </Unit3>
-      <Unit4>
-        <Filename Value="UFileAnalization.pas"/>
-        <IsPartOfProject Value="True"/>
-      </Unit4>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

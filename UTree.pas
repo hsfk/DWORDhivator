@@ -5,176 +5,179 @@ unit UTree;
 interface
 
 uses
-  Classes, SysUtils, crt, bitops;
+  Classes, SysUtils, crt, UBitOps;
 
 type
-  nodeptr = ^node;
+  NodePtr = ^Node;
 
-  node = record
-    key: byte;
-    weight: longint;
-    prev, Next, right, left: nodeptr;
-    flag: boolean; //list ili net
+  Node = record
+    Key: byte;
+    Weight: longint;
+    Prev: NodePtr;
+    Next: NodePtr;
+    Right: NodePtr;
+    Left: NodePtr;
+    IsLeave: boolean;
   end;
 
-  FrequencyTable = array [0..255] of longword;
-  Cache = array [0..255] of string;
-
-  Ttree = class
-    Table: FrequencyTable;
+  THuffmanTree = class
   public
-    function GetTable(SomeTable: FrequencyTable): cache;
-    function MakeTree(SomeTable: FrequencyTable): nodeptr;
-    function GetBCache(SomeLCache: LengthCache): BitCache;
-    function GetFTable(SomeLCache: LengthCache): FrequencyTable;
+    constructor Create;
+    function GetCache(FTable: FrequencyTable): Cache;
+    function MakeTree(FTable: FrequencyTable): NodePtr;
+    function GetBCache(LCache: LengthCache): BitCache;
+    function GetFTable(LCache: LengthCache): FrequencyTable;
   private
-    procedure GetRoutes(tmp: nodeptr; s: string);
-    function CreateNode(key: byte; weight: longint): nodeptr;
-    function merge(node1, node2: nodeptr): nodeptr;
-    procedure AddToQueue(newnode: nodeptr);
-    function Pop: nodeptr;
+    Qhead: NodePtr;
+    Routes: Cache;
+    procedure GetRoutes(Root: NodePtr; Str: string);
+    function CreateNode(Key: byte; Weight: longint): NodePtr;
+    function Merge(Node_A, Node_B: NodePtr): NodePtr;
+    procedure AddToQueue(NewNode: NodePtr);
+    function Pop: NodePtr;
   end;
 
 var
-  Qhead: nodeptr;
-  Routes: cache;
-  Fbit: Tbit;
-  BCache: BitCache;
-  LCache: lengthCache;
+  Tree: THuffmanTree;
 
 implementation
 
-function Ttree.GetTable(SomeTable: FrequencyTable): cache;
-var
-  root: nodeptr;
+constructor THuffmanTree.Create;
 begin
-  root := MakeTree(SomeTable);
-  if (root^.right = nil) and (root^.left = nil) then
-    Routes[root^.key] := '1'
+
+end;
+
+function THuffmanTree.GetCache(FTable: FrequencyTable): Cache;
+var
+  Root: NodePtr;
+begin
+  Root := MakeTree(FTable);
+  if (Root^.Right = nil) and (Root^.Left = nil) then
+    Routes[Root^.Key] := '1'
   else
-    GetRoutes(root, '');
+    GetRoutes(Root, '');
   Result := routes;
 end;
 
-function Ttree.MakeTree(SomeTable: FrequencyTable): nodeptr;
+function THuffmanTree.MakeTree(FTable: FrequencyTable): NodePtr;
 var
   i: integer;
-  root, newnode: nodeptr;
+  Root: NodePtr;
+  NewNode: NodePtr;
 begin
   new(Qhead);
   Qhead^.Next := nil;
-  Qhead^.prev := nil;
+  Qhead^.Prev := nil;
   for i := 0 to 255 do begin
-    if sometable[i] > 0 then begin
-      newnode := CreateNode(i, SomeTable[i]);
-      AddToQueue(newnode);
+    if FTable[i] > 0 then begin
+      NewNode := CreateNode(i, FTable[i]);
+      AddToQueue(NewNode);
     end;
   end;
   if Qhead^.Next^.Next = nil then begin
-    Result := pop;
+    Result := Pop;
     exit;
   end;
   while Qhead^.Next^.Next <> nil do begin
-    root := merge(pop, pop);
-    AddToQueue(root);
+    Root := Merge(Pop, Pop);
+    AddToQueue(Root);
   end;
-  Result := root;
+  Result := Root;
 end;
 
-function Ttree.GetBCache(SomeLCache: LengthCache): BitCache;
+function THuffmanTree.GetBCache(LCache: LengthCache): BitCache;
 var
-  root: nodeptr;
-  TestTable: FrequencyTable;
+  Root: NodePtr;
+  FTable: FrequencyTable;
 begin
-  TestTable := GetFTable(SomeLCache);
-  root := MakeTree(TestTable);
-  GetRoutes(root, '');
-  Result := Fbit.GetBitCache(Routes);
+  FTable := GetFTable(LCache);
+  Root := MakeTree(FTable);
+  GetRoutes(Root, '');
+  Result := BitOps.GetBitCache(Routes);
 end;
 
-function Ttree.GetFTable(SomeLCache: LengthCache): FrequencyTable;
-  //составляет таблицу частот относительно высоты элемента в дереве
-
+function THuffmanTree.GetFTable(LCache: LengthCache): FrequencyTable;
 var
-  Weights: array [0..24] of longword; //увеличить если будут баги
+  Weights: array [0..24] of longword;
   i: byte;
 begin
   Weights[0] := 0;
   Weights[1] := 8388608;
-  for i := 2 to 24 do//заполняем таблицу, частота элемента на i высоте будет меньше в 2 раза
-    Weights[i] := Weights[i - 1] div 2; // чем высота элемента на i+1 высоте
+  for i := 2 to 24 do
+    Weights[i] := Weights[i - 1] div 2;
   for i := 0 to 255 do
-    Result[i] := Weights[SomeLCache[i]];
+    Result[i] := Weights[LCache[i]];
 end;
 
-procedure Ttree.GetRoutes(tmp: nodeptr; s: string);
+procedure THuffmanTree.GetRoutes(Root: NodePtr; Str: string);
 begin
-  if tmp^.right <> nil then
-    getroutes(tmp^.right, s + '1');
-  if tmp^.flag = True then
-    Routes[tmp^.key] := s;
-  if tmp^.left <> nil then
-    getroutes(tmp^.left, s + '0');
+  if Root^.Right <> nil then
+    GetRoutes(Root^.Right, Str + '1');
+  if Root^.IsLeave = True then
+    Routes[Root^.Key] := Str;
+  if Root^.Left <> nil then
+    GetRoutes(Root^.Left, Str + '0');
 end;
 
-function Ttree.CreateNode(key: byte; weight: longint): nodeptr;
-begin
-  new(Result);
-  Result^.key := key;
-  Result^.weight := weight;
-  Result^.prev := nil;
-  Result^.Next := nil;
-  Result^.right := nil;
-  Result^.left := nil;
-  Result^.flag := True;
-end;
-
-function Ttree.merge(node1, node2: nodeptr): nodeptr;
+function THuffmanTree.CreateNode(Key: byte; Weight: longint): NodePtr;
 begin
   new(Result);
-  Result^.key := 0;
-  Result^.prev := nil;
+  Result^.Key := Key;
+  Result^.Weight := Weight;
+  Result^.Prev := nil;
   Result^.Next := nil;
-  Result^.right := node2;
-  Result^.left := node1;
-  Result^.flag := False;
-  Result^.weight := node1^.weight + node2^.weight;
+  Result^.Right := nil;
+  Result^.Left := nil;
+  Result^.IsLeave := True;
 end;
 
-procedure Ttree.AddToQueue(newnode: nodeptr);
+function THuffmanTree.Merge(Node_A, Node_B: NodePtr): NodePtr;
+begin
+  new(Result);
+  Result^.Key := 0;
+  Result^.Prev := nil;
+  Result^.Next := nil;
+  Result^.Right := Node_B;
+  Result^.Left := Node_A;
+  Result^.IsLeave := False;
+  Result^.Weight := Node_A^.Weight + Node_B^.Weight;
+end;
+
+procedure THuffmanTree.AddToQueue(NewNode: NodePtr);
 var
-  tmp, tmpptr: nodeptr;
+  Temp: NodePtr;
+  TempPtr: NodePtr;
 begin
   if Qhead^.Next = nil then begin
-    Qhead^.Next := newnode;
-    newnode^.prev := Qhead;
+    Qhead^.Next := NewNode;
+    NewNode^.Prev := Qhead;
   end
   else begin
-    tmp := Qhead^.Next;
-    while (tmp^.Next <> nil) and (tmp^.weight < newnode^.weight) do
-      tmp := tmp^.Next;
-    if (tmp^.Next = nil) and (newnode^.weight > tmp^.weight) then begin
-      tmp^.Next := newnode;
-      newnode^.prev := tmp;
-      newnode^.Next := nil;
+    Temp := Qhead^.Next;
+    while (Temp^.Next <> nil) and (Temp^.Weight < NewNode^.Weight) do
+      Temp := Temp^.Next;
+    if (Temp^.Next = nil) and (NewNode^.Weight > Temp^.Weight) then begin
+      Temp^.Next := NewNode;
+      NewNode^.Prev := Temp;
+      NewNode^.Next := nil;
     end
     else begin
-      tmpptr := tmp^.prev;
-      tmp^.prev := newnode;
-      newnode^.Next := tmp;
-      newnode^.prev := tmpptr;
-      newnode^.prev^.Next := newnode;
+      TempPtr := Temp^.Prev;
+      Temp^.Prev := NewNode;
+      NewNode^.Next := Temp;
+      NewNode^.Prev := TempPtr;
+      NewNode^.Prev^.Next := NewNode;
     end;
   end;
 end;
 
-function Ttree.Pop: nodeptr;
+function THuffmanTree.Pop: NodePtr;
 begin
   Result := Qhead^.Next;
   if Qhead^.Next <> nil then begin
     Qhead^.Next := Result^.Next;
     if Qhead^.Next <> nil then
-      Qhead^.Next^.prev := Qhead;
+      Qhead^.Next^.Prev := Qhead;
   end;
 end;
 
